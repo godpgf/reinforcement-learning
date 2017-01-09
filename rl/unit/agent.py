@@ -13,6 +13,9 @@ class Agent(object):
     def reset(self):
         self.states = []
 
+    def takeAction(self):
+        raise NotImplementedError
+
 
 
 
