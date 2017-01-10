@@ -2,6 +2,6 @@
 #author=godpgf
 
 from .agent import Agent
-from .environment import Environment
+from .director import Director
 from .policy import Policy
 from .state import State

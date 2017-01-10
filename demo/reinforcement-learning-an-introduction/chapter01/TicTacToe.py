@@ -24,13 +24,33 @@ class T3State(State):
                 self.hashVal = self.hashVal * 3 + i
         return int(self.hashVal)
 
-class T3Policy(Policy):
+    # print the board
+    def show(self):
+        for i in range(0, BOARD_ROWS):
+            print('-------------')
+            out = '| '
+            for j in range(0, BOARD_COLS):
+                if self.data[i, j] == 1:
+                    token = '*'
+                if self.data[i, j] == 0:
+                    token = '0'
+                if self.data[i, j] == -1:
+                    token = 'x'
+                out += token + ' | '
+            print(out)
+        print('-------------')
 
+class T3Policy(Policy):
     def __init__(self, symbol, stepSize = 0.1, exploreRate = 0.1):
         self.symbol = symbol
         self.stepSize = stepSize
         self.exploreRate = exploreRate
         self.estimations = dict()
+
+    def chooseAction(self, state, nextActions, t_cur=None, t_max=None):
+        if nextActions is None:
+            return None
+        return self.chooseExploreGreedyAction(state, nextActions, self.exploreRate)
 
     def getActions(self, state):
         if self.isEnd(state):
@@ -58,6 +78,21 @@ class T3Policy(Policy):
             return self.estimations[id]
         else:
             return 0.5
+
+    def feedReward(self, states, reward):
+        if len(states) == 0:
+            return
+        states = [state.getHash() for state in states]
+        target = reward
+        for latestState in reversed(states):
+            value = self.estimations[latestState] + self.stepSize * (target - self.estimations[latestState])
+            self.estimations[latestState] = value
+            target = value
+
+    def feedState(self, state):
+        id = state.getHash()
+        if id not in self.estimations:
+            self.estimations[id] = 0.5
 
     def isEnd(self, state):
         if state.end is not None:
@@ -89,13 +124,99 @@ class T3Policy(Policy):
         sum = np.sum(np.abs(state.data))
         if sum == BOARD_ROWS * BOARD_COLS:
             state.end = 0.5
-            return self.end
+            return state.end
 
         state.end = None
         return state.end
 
-class T3Agent(Agent):
+    def save(self):
+        fw = open('optimal_policy_' + str(self.symbol), 'wb')
+        pickle.dump(self.estimations, fw)
+        fw.close()
+
+    def load(self):
+        fr = open('optimal_policy_' + str(self.symbol),'rb')
+        self.estimations = pickle.load(fr)
+        fr.close()
+
+show = False
+
+class T3Director(Director):
+    def __init__(self):
+        self.player1 = None
+        self.player2 = None
+        self.currentPlayer = None
+        self.currentState = None
+
+    def reset(self):
+        self.currentState = T3State()
+        self.player1.reset()
+        self.player2.reset()
+        self.currentPlayer = None
+        self.feedCurrentState()
+
+    def feedCurrentState(self):
+        self.player1.feedState(self.currentState)
+        self.player2.feedState(self.currentState)
+
+    def play(self, t_cur, t_max):
+        self.reset()
+        while True:
+            # set current player
+            if self.currentPlayer == self.player1:
+                self.currentPlayer = self.player2
+            else:
+                self.currentPlayer = self.player1
+            if show:
+                self.currentState.show()
+            action = self.currentPlayer.takeAction(t_cur, t_max)
+            if action is None:
+                print "nono"
+            self.currentState, reward = self.currentPlayer.step(action)
+            hashValue = self.currentState.getHash()
+            self.feedCurrentState()
+            isEnd = self.currentPlayer.isEnd()
+            if isEnd is None:
+                continue
+            if isEnd == 0.5:
+                self.player1.feedReward(0)
+                self.player2.feedReward(0)
+                return None
+            elif isEnd == 1.0:
+                if self.currentPlayer == self.player1:
+                    self.player1.feedReward(1)
+                    self.player2.feedReward(0)
+                else:
+                    self.player1.feedReward(0)
+                    self.player2.feedReward(1)
+                return self.currentPlayer
+            else:
+                if self.currentPlayer == self.player1:
+                    self.player1.feedReward(1)
+                    self.player2.feedReward(0)
+                    return self.player2
+                else:
+                    self.player1.feedReward(0)
+                    self.player2.feedReward(1)
+                    return self.player1
+
+    def train(self, epochs):
+        self.player1 = Agent(T3Policy(1))
+        self.player2 = Agent(T3Policy(-1))
+        p1Win = 0
+        p2Win = 0
+        for i in range(epochs):
+            winner = self.play(i,epochs)
+            if winner == self.player1:
+                p1Win += 1
+            if winner == self.player2:
+                p2Win += 1
+            self.reset()
+        print("player1 win rate %.2f%%"%(p1Win*100.0/epochs))
+        print("player2 win rate %.2f%%"%(p2Win*100.0/epochs))
+        self.player1.savePolicy()
+        self.player2.savePolicy()
 
 
-
-
+direct = T3Director()
+direct.train(2000)

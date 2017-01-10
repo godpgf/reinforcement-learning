@@ -30,6 +30,19 @@ class Policy(object):
     def step(self, state, action):
         raise NotImplementedError
 
+
+    def save(self):
+        raise NotImplementedError
+
+    def load(self):
+        raise NotImplementedError
+
+    def feedReward(self, states, reward):
+        raise NotImplementedError
+
+    def feedState(self, state):
+        raise NotImplementedError
+
     #用explore greedy算法得到行为
     def chooseExploreGreedyAction(self, state, nextActions, exploreRate):
         if np.random.binomial(1, exploreRate):
@@ -37,7 +50,7 @@ class Policy(object):
             return nextActions[0]
         values = []
         for a in nextActions:
-            values.append(self.estimation(state,a))
+            values.append((self.estimation(state,a),a))
         #np.random.shuffle(values)
         values.sort(key=lambda x: x[0], reverse=True)
         return values[0][1]
