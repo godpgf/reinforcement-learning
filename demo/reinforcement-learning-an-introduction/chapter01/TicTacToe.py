@@ -8,6 +8,7 @@ BOARD_ROWS = 3
 BOARD_COLS = 3
 BOARD_SIZE = BOARD_ROWS * BOARD_COLS
 
+
 class T3State(State):
     def __init__(self):
         self.data = np.zeros((BOARD_ROWS, BOARD_COLS))
@@ -23,11 +24,41 @@ class T3State(State):
                 self.hashVal = self.hashVal * 3 + i
         return int(self.hashVal)
 
-class T3Environment(Environment):
+class T3Policy(Policy):
 
+    def __init__(self, symbol, stepSize = 0.1, exploreRate = 0.1):
+        self.symbol = symbol
+        self.stepSize = stepSize
+        self.exploreRate = exploreRate
+        self.estimations = dict()
 
+    def getActions(self, state):
+        if self.isEnd(state):
+            return None
+        nextPositions = []
+        for i in range(BOARD_ROWS):
+            for j in range(BOARD_COLS):
+                if state.data[i, j] == 0:
+                    nextPositions.append([i, j])
+        return nextPositions
 
-    #del
+    def step(self, state, action):
+        newState = T3State()
+        newState.data = np.copy(state.data)
+        newState.data[action[0],action[1]] = self.symbol
+        return newState, 0
+
+    def estimation(self, state, action = None):
+        nextState, reward = self.step(state, action)
+        id = nextState.getHash()
+        e_reward = self.isEnd(nextState)
+        if e_reward is not None:
+            self.estimations[id] = e_reward
+        if id in self.estimations:
+            return self.estimations[id]
+        else:
+            return 0.5
+
     def isEnd(self, state):
         if state.end is not None:
             return state.end
@@ -49,21 +80,22 @@ class T3Environment(Environment):
 
         for result in results:
             if result == 3:
-                #self.winner = 1
-                state.end = True
+                state.end = 1.0 if self.symbol == 1 else 0.0
                 return state.end
             if result == -3:
-                #self.winner = -1
-                state.end = True
-                return self.end
+                state.end = state.end = 1.0 if self.symbol == -1 else 0.0
+                return state.end
 
-        # whether it's a tie
-        sum = np.sum(np.abs(self.data))
+        sum = np.sum(np.abs(state.data))
         if sum == BOARD_ROWS * BOARD_COLS:
-            self.winner = 0
-            self.end = True
+            state.end = 0.5
             return self.end
 
-        # game is still going on
-        self.end = False
-        return self.end
+        state.end = None
+        return state.end
+
+class T3Agent(Agent):
+
+
+
+
