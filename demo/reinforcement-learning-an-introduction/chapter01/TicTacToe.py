@@ -41,7 +41,7 @@ class T3State(State):
         print('-------------')
 
 class T3Policy(Policy):
-    def __init__(self, symbol, stepSize = 0.1, exploreRate = 0.1):
+    def __init__(self, symbol, stepSize = 0.1, exploreRate = 0.8):
         self.symbol = symbol
         self.stepSize = stepSize
         self.exploreRate = exploreRate
@@ -139,6 +139,23 @@ class T3Policy(Policy):
         self.estimations = pickle.load(fr)
         fr.close()
 
+# human interface
+# input a number to put a chessman
+# | 1 | 2 | 3 |
+# | 4 | 5 | 6 |
+# | 7 | 8 | 9 |
+class HummanAgent(Agent):
+
+    def takeAction(self, t_cur = None, t_max = None):
+        self.states[-1].show()
+        data = int(input("Input your position:")) - 1
+        i = data // int(BOARD_COLS)
+        j = int(data - i * BOARD_COLS)
+        if self.states[-1].data[i,j] != 0:
+            return self.takeAction(t_cur, t_max)
+        return [i,j]
+
+
 show = False
 
 class T3Director(Director):
@@ -159,7 +176,7 @@ class T3Director(Director):
         self.player1.feedState(self.currentState)
         self.player2.feedState(self.currentState)
 
-    def play(self, t_cur, t_max):
+    def play(self, t_cur = None, t_max = None):
         self.reset()
         while True:
             # set current player
@@ -170,8 +187,6 @@ class T3Director(Director):
             if show:
                 self.currentState.show()
             action = self.currentPlayer.takeAction(t_cur, t_max)
-            if action is None:
-                print "nono"
             self.currentState, reward = self.currentPlayer.step(action)
             hashValue = self.currentState.getHash()
             self.feedCurrentState()
@@ -217,6 +232,39 @@ class T3Director(Director):
         self.player1.savePolicy()
         self.player2.savePolicy()
 
+    def compete(self, turns):
+        self.player1 = Agent(T3Policy(1, 0.1, 0))
+        self.player2 = Agent(T3Policy(-1, 0.1, 0))
+        p1Win = 0
+        p2Win = 0
+        self.player1.loadPolicy()
+        self.player2.loadPolicy()
+        for i in range(turns):
+            print("Epoch", i)
+            winner = self.play(i,turns)
+            if winner == self.player1:
+                p1Win += 1
+            if winner == self.player2:
+                p2Win += 1
+            self.reset()
+        print("player1 win rate %.2f%%"%(p1Win*100.0/turns))
+        print("player2 win rate %.2f%%"%(p2Win*100.0/turns))
+
+    def vs_human(self):
+        self.player1 = HummanAgent(T3Policy(1, 0.1, 0))
+        self.player2 = Agent(T3Policy(-1, 0.1, 0))
+        self.player2.loadPolicy()
+        while True:
+            winner = self.play()
+            if winner == self.player1:
+                print("win!")
+            elif winner == self.player2:
+                print("lost!")
+            else:
+                print("tie!")
+            self.reset()
 
 direct = T3Director()
 direct.train(2000)
+#direct.train(500)
+direct.vs_human()
