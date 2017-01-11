@@ -41,7 +41,7 @@ class T3State(State):
         print('-------------')
 
 class T3Policy(Policy):
-    def __init__(self, symbol, stepSize = 0.1, exploreRate = 0.8):
+    def __init__(self, symbol, stepSize = 0.6, exploreRate = 0.8):
         self.symbol = symbol
         self.stepSize = stepSize
         self.exploreRate = exploreRate
@@ -82,9 +82,11 @@ class T3Policy(Policy):
     def feedReward(self, states, reward):
         if len(states) == 0:
             return
+
         states = [state.getHash() for state in states]
         target = reward
         for latestState in reversed(states):
+            print "%d:%.2f->%.2f"%(latestState,self.estimations[latestState],self.estimations[latestState] + self.stepSize * (target - self.estimations[latestState]))
             value = self.estimations[latestState] + self.stepSize * (target - self.estimations[latestState])
             self.estimations[latestState] = value
             target = value
@@ -155,6 +157,8 @@ class HummanAgent(Agent):
             return self.takeAction(t_cur, t_max)
         return [i,j]
 
+    def feedReward(self, reward):
+        return
 
 show = False
 
@@ -251,8 +255,8 @@ class T3Director(Director):
         print("player2 win rate %.2f%%"%(p2Win*100.0/turns))
 
     def vs_human(self):
-        self.player1 = HummanAgent(T3Policy(1, 0.1, 0))
-        self.player2 = Agent(T3Policy(-1, 0.1, 0))
+        self.player1 = HummanAgent(T3Policy(1, 0.6, 0))
+        self.player2 = Agent(T3Policy(-1, 0.6, 0))
         self.player2.loadPolicy()
         while True:
             winner = self.play()
@@ -265,6 +269,6 @@ class T3Director(Director):
             self.reset()
 
 direct = T3Director()
-direct.train(2000)
+#direct.train(200000)
 #direct.train(500)
 direct.vs_human()
