@@ -41,10 +41,11 @@ class T3State(State):
         print('-------------')
 
 class T3Policy(Policy):
-    def __init__(self, symbol, stepSize = 0.6, exploreRate = 0.8):
+    def __init__(self, symbol, stepSize = 0.16, exploreRate = 0.16, alpha = 0.6):
         self.symbol = symbol
         self.stepSize = stepSize
         self.exploreRate = exploreRate
+        self.alpha = alpha
         self.estimations = dict()
 
     def chooseAction(self, state, nextActions, t_cur=None, t_max=None):
@@ -66,7 +67,10 @@ class T3Policy(Policy):
         newState = T3State()
         newState.data = np.copy(state.data)
         newState.data[action[0],action[1]] = self.symbol
-        return newState, 0
+        reward = 0
+        if self.isEnd(newState) is not None:
+            reward = 1
+        return newState, reward
 
     def estimation(self, state, action = None):
         nextState, reward = self.step(state, action)
@@ -77,7 +81,7 @@ class T3Policy(Policy):
         if id in self.estimations:
             return self.estimations[id]
         else:
-            return 0.5
+            return 0.32
 
     def feedReward(self, states, reward):
         if len(states) == 0:
@@ -86,10 +90,27 @@ class T3Policy(Policy):
         states = [state.getHash() for state in states]
         target = reward
         for latestState in reversed(states):
-            print "%d:%.2f->%.2f"%(latestState,self.estimations[latestState],self.estimations[latestState] + self.stepSize * (target - self.estimations[latestState]))
+            #print "%d:%.2f->%.2f"%(latestState,self.estimations[latestState],self.estimations[latestState] + self.stepSize * (target - self.estimations[latestState]))
             value = self.estimations[latestState] + self.stepSize * (target - self.estimations[latestState])
             self.estimations[latestState] = value
             target = value
+
+    def updateReward(self, states):
+        if len(states) <= 2:
+            return
+        #Q-Learning更新
+        last = self.estimations[states[-2].getHash()]
+
+        if self.isEnd(states[-1]):
+            self.estimations[states[-2].getHash()] = last - self.alpha * last
+            #states[-2].show()
+            #print '%.2f -> %.2f' % (last, self.estimations[states[-2].getHash()])
+        else:
+            maxRewardAction = self.chooseExploreGreedyAction(states[-1], self.getActions(states[-1]), 0)
+            nextState, reward = self.step(states[-1], maxRewardAction)
+            self.estimations[states[-2].getHash()] = last + self.alpha * (reward + self.stepSize * self.estimation(states[-1], maxRewardAction) - last)
+            #states[-2].show()
+            #print '%d,%d  %.2f -> %.2f' % (maxRewardAction[0], maxRewardAction[1], last, self.estimations[states[-2].getHash()])
 
     def feedState(self, state):
         id = state.getHash()
@@ -160,7 +181,11 @@ class HummanAgent(Agent):
     def feedReward(self, reward):
         return
 
+    def updateReward(self):
+        return
+
 show = False
+Q_Learning = True
 
 class T3Director(Director):
     def __init__(self):
@@ -192,35 +217,45 @@ class T3Director(Director):
                 self.currentState.show()
             action = self.currentPlayer.takeAction(t_cur, t_max)
             self.currentState, reward = self.currentPlayer.step(action)
-            hashValue = self.currentState.getHash()
+            #hashValue = self.currentState.getHash()
             self.feedCurrentState()
             isEnd = self.currentPlayer.isEnd()
+
+            if Q_Learning is True:
+                if self.currentPlayer == self.player1:
+                    self.player2.updateReward()
+                else:
+                    self.player1.updateReward()
+
             if isEnd is None:
                 continue
+
             if isEnd == 0.5:
-                self.player1.feedReward(0)
-                self.player2.feedReward(0)
+                if Q_Learning is False:
+                    self.player1.feedReward(0.5*reward)
+                    self.player2.feedReward(0.5*reward)
                 return None
             elif isEnd == 1.0:
-                if self.currentPlayer == self.player1:
-                    self.player1.feedReward(1)
-                    self.player2.feedReward(0)
-                else:
-                    self.player1.feedReward(0)
-                    self.player2.feedReward(1)
+                if Q_Learning is False:
+                    if self.currentPlayer == self.player1:
+                        self.player1.feedReward(reward)
+                        self.player2.feedReward(0)
+                    else:
+                        self.player1.feedReward(0)
+                        self.player2.feedReward(reward)
                 return self.currentPlayer
             else:
-                if self.currentPlayer == self.player1:
-                    self.player1.feedReward(1)
-                    self.player2.feedReward(0)
-                    return self.player2
-                else:
-                    self.player1.feedReward(0)
-                    self.player2.feedReward(1)
-                    return self.player1
+                if Q_Learning is False:
+                    if self.currentPlayer == self.player1:
+                        self.player1.feedReward(reward)
+                        self.player2.feedReward(0)
+                    else:
+                        self.player1.feedReward(0)
+                        self.player2.feedReward(reward)
+                return self.player2 if self.currentPlayer == self.player1 else self.player1
 
     def train(self, epochs):
-        self.player1 = Agent(T3Policy(1))
+        self.player1 = Agent(T3Policy(1, 0.01, 0.8, 0.01))
         self.player2 = Agent(T3Policy(-1))
         p1Win = 0
         p2Win = 0
@@ -269,6 +304,6 @@ class T3Director(Director):
             self.reset()
 
 direct = T3Director()
-#direct.train(200000)
+direct.train(200000)
 #direct.train(500)
 direct.vs_human()

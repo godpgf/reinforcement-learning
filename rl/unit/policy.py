@@ -37,7 +37,12 @@ class Policy(object):
     def load(self):
         raise NotImplementedError
 
+    #蒙特卡洛发反馈
     def feedReward(self, states, reward):
+        raise NotImplementedError
+
+    #Q-Learning反馈
+    def updateReward(self, states):
         raise NotImplementedError
 
     def feedState(self, state):

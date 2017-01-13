@@ -35,6 +35,9 @@ class Agent(object):
     def feedReward(self, reward):
         self.policy.feedReward(self.states, reward)
 
+    def updateReward(self):
+        self.policy.updateReward(self.states)
+
 
 
 
