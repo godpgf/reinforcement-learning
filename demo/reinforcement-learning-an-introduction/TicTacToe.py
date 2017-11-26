@@ -67,9 +67,9 @@ class T3Policy(Policy):
         newState = T3State()
         newState.data = np.copy(state.data)
         newState.data[action[0],action[1]] = self.symbol
-        reward = 0
-        if self.isEnd(newState) is not None:
-            reward = 1
+        reward = self.isEnd(newState)
+        if reward is None:
+            reward = 0
         return newState, reward
 
     def estimation(self, state, action = None):
@@ -303,7 +303,8 @@ class T3Director(Director):
                 print("tie!")
             self.reset()
 
-direct = T3Director()
-direct.train(200000)
-#direct.train(500)
-direct.vs_human()
+if __name__ == "__main__":
+    direct = T3Director()
+    direct.train(200000)
+    #direct.train(500)
+    direct.vs_human()
